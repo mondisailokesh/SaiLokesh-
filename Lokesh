@@ -1,0 +1,72 @@
+
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+# Load occupancy data (CSV file)
+df = pd.read_csv('occupancy_data.csv')  # Example columns: ['date', 'occupancy_rate']
+
+# Convert 'date' column to datetime
+df['date'] = pd.to_datetime(df['date'])
+
+# Define a threshold for low occupancy (e.g., 50%)
+low_occupancy_threshold = 50.0
+
+# Find periods with low occupancy
+low_occupancy_periods = df[df['occupancy_rate'] < low_occupancy_threshold]
+
+# Detect if the current date is within a low occupancy period
+current_date = datetime.now()
+if not df[df['date'] == current_date].empty:
+    current_occupancy = df[df['date'] == current_date]['occupancy_rate'].values[0]
+    if current_occupancy < low_occupancy_threshold:
+        print("Occupancy is low! Time to trigger a campaign.")
+    else:
+        print("Occupancy is stable.")
+else:
+    print("No data available for today.")
+
+Step 2: Trigger Automated Campaign
+
+Once low occupancy is detected, we can automate a campaign using a marketing platform API (e.g., Mailchimp, SendGrid, etc.). Below is a sample script using the Mailchimp API:
+
+import requests
+
+# Mailchimp API keys and list ID
+API_KEY = 'your-mailchimp-api-key'
+LIST_ID = 'your-mailchimp-list-id'
+CAMPAIGN_URL = f'https://<dc>.api.mailchimp.com/3.0/campaigns'
+
+def trigger_email_campaign(subject, content):
+    headers = {
+        'Authorization': f'Bearer {API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    
+    campaign_data = {
+        "recipients": {
+            "list_id": LIST_ID
+        },
+        "type": "regular",
+        "settings": {
+            "subject_line": subject,
+            "from_name": "Your Hotel",
+            "reply_to": "info@yourhotel.com"
+        }
+    }
+    
+    # Create campaign
+    response = requests.post(CAMPAIGN_URL, headers=headers, json=campaign_data)
+    if response.status_code == 200:
+        campaign_id = response.json().get("id")
+        # Add content
+        content_data = {
+            "html": content
+        }
+        content_url = f"{CAMPAIGN_URL}/{campaign_id}/content"
+        requests.put(content_url, headers=headers, json=content_data)
+        
+        # Send campaign
+        send_url = f"{CAMPAIGN_URL}/{campaign_id}/actions/send"
+        requests.post(send_url, headers=headers)
+        print(f"Campaign triggered successfully")
